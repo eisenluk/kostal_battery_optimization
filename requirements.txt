@@ -1,0 +1,3 @@
+requests>=2.31,<3
+pycryptodomex>=3.20,<4
+astral>=3.2,<4
