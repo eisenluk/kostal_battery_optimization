@@ -46,9 +46,11 @@ so reaching 100% cannot be guaranteed on unexpectedly poor-weather days.
 ## Requirements
 
 - Python 3.9 or newer
-- A KOSTAL PLENTICORE G3 inverter reachable over the local network
+- A KOSTAL PLENTICORE G3 inverter reachable over the local network and a local
+  inverter user account with permission to read and change battery settings
 - A battery connected to the inverter
-- A Solcast Home User account with one or two rooftop sites
+- A [Solcast](https://www.solcast.com/) Home User account with one or two
+  configured rooftop PV sites
 
 ## Installation
 
@@ -77,6 +79,33 @@ For unattended execution, store the values in a protected environment file or
 systemd service configuration and restrict access to that file.
 
 ## Automatic forecast mode
+
+### Solcast resource IDs
+
+`YOUR_SOUTH_RESOURCE_ID` and `YOUR_NORTH_RESOURCE_ID` are the resource IDs of
+the rooftop PV sites configured in your Solcast account. They are not KOSTAL
+device IDs.
+
+Create a separate Solcast rooftop site for each materially different array
+orientation. For this installation, one site represents all south-facing PV
+modules and the other represents all north-facing PV modules. Configure each
+site with its corresponding total module capacity, inverter AC capacity,
+azimuth, tilt, location, and efficiency factor.
+
+Open the rooftop site in the Solcast portal after creating it. The resource ID
+is shown in the site summary and is also part of the forecast API URL:
+
+```text
+https://api.solcast.com.au/rooftop_sites/RESOURCE_ID/forecasts?format=json
+```
+
+For example, if the URL contains
+`/rooftop_sites/abcd-1234-efgh-5678/forecasts`, use
+`abcd-1234-efgh-5678` as the command-line value. Do not include the full URL.
+
+If the system only has one relevant array orientation, the script currently
+still expects both resource-ID arguments. Configure the Solcast sites according
+to the actual PV installation rather than reusing an unrelated resource ID.
 
 Always run the script without `--apply` first. This produces a preview and does
 not change the inverter configuration:
