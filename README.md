@@ -172,17 +172,68 @@ Add `--apply` to write the manual schedule.
 
 ## Automation
 
-Changing the KOSTAL time-controlled battery settings may restart MPPT tracking
-temporarily. For that reason, this script is designed to run once per day before
-PV production begins, for example 30 minutes before sunrise.
+### Why the script should run only once per day
+
+Solcast's free plan allows a maximum of 10 API calls per day. Each automatic
+run of this script makes two Solcast API requests (one per rooftop site), so
+frequent scheduling can exhaust the daily quota quickly.
+
+In addition, changing the KOSTAL time-controlled battery setting resets all
+MPPT trackers of the PLENTICORE inverter. It can take up to 10 minutes for the
+trackers to return to their optimal operating point, temporarily reducing PV
+yield.
+
+For both reasons, it is best practice to fetch the Solcast forecast in the
+morning and update the KOSTAL inverter only once per day.
 
 The script can be triggered by Node-RED, cron, or a systemd timer. When using
 Node-RED, execute the script on the Linux host through SSH or another remote
 execution mechanism. Avoid installing and running Python inside the Node-RED
 container unless that setup is intentionally maintained.
 
-Each automatic run makes two Solcast API requests: one request for each rooftop
-site. Keep the account's daily request limit in mind when testing.
+### run-kostal.sh
+
+`run-kostal.sh` is a wrapper script intended to be triggered by a cron job. It
+loads the credentials from an environment file, prevents overlapping runs with
+a lock file, and then calls `kostal_battery_optimization.py` with a fixed set
+of arguments.
+
+Before using it, adjust the script for your own installation:
+
+- `PROJECT_DIR`: path to the cloned repository.
+- `ENV_FILE`: path to the environment file containing `KOSTAL_PASSWORD` and
+  `SOLCAST_API_KEY`.
+- The `exec "$PROJECT_DIR/.venv/bin/python" ...` call and its parameters
+  (`--host`, `--south-resource-id`, `--north-resource-id`, battery capacity,
+  etc.) to match your inverter and Solcast configuration.
+
+Example crontab entry that runs the script every day at 05:30, before sunrise,
+and applies the calculated schedule:
+
+```cron
+30 5 * * * /home/eisenluk/kostal_battery_optimization/run-kostal.sh --apply >> /home/eisenluk/kostal_battery_optimization/kostal-cron.log 2>&1
+```
+
+Without `--apply`, the script only prints the calculated schedule and does not
+write it to the inverter.
+
+### Dynamic scheduling with run-after-sunrise.py
+
+Sunrise time shifts throughout the year, so a fixed cron time is either too
+early in summer or too late in winter. `run-after-sunrise.py` calculates
+today's sunrise for the configured location, waits until 30 minutes after
+sunrise, and then runs `run-kostal.sh --apply`.
+
+Schedule it once per day, early enough to cover the earliest possible sunrise
+of the year:
+
+```cron
+0 3 * * * /home/eisenluk/kostal_battery_optimization/run-after-sunrise.py >> /home/eisenluk/kostal_battery_optimization/sunrise-cron.log 2>&1
+```
+
+This starts the script at 03:00, which then sleeps until 30 minutes after
+sunrise and triggers `run-kostal.sh`, so the battery schedule is calculated and
+applied at a time that automatically adapts to the season.
 
 ## Output
 
