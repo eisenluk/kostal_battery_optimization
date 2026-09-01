@@ -65,6 +65,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+On Debian/Ubuntu, if `python3 -m venv` fails with `ensurepip is not
+available`, install the venv package first and repeat the command above:
+
+```bash
+sudo apt install python3-venv
+```
+
 ## Credentials
 
 The script reads credentials from environment variables. Do not store passwords
@@ -75,8 +82,22 @@ export KOSTAL_PASSWORD='your-kostal-password'
 export SOLCAST_API_KEY='your-solcast-api-key'
 ```
 
-For unattended execution, store the values in a protected environment file or
-systemd service configuration and restrict access to that file.
+For unattended execution, store the values in a protected environment file
+instead, e.g. `kostal-battery.env` in the project directory:
+
+```bash
+KOSTAL_PASSWORD=your-kostal-password
+SOLCAST_API_KEY=your-solcast-api-key
+```
+
+Restrict access to the owner only, since the file contains plaintext secrets:
+
+```bash
+chmod 600 kostal-battery.env
+```
+
+`run-kostal.sh` loads this file automatically (see below). The file name is
+already covered by `.gitignore` and must never be committed.
 
 ## Automatic forecast mode
 
@@ -195,17 +216,24 @@ container unless that setup is intentionally maintained.
 
 `run-kostal.sh` is a wrapper script intended to be triggered by a cron job. It
 loads the credentials from an environment file, prevents overlapping runs with
-a lock file, and then calls `kostal_battery_optimization.py` with a fixed set
-of arguments.
+a lock file, calls `kostal_battery_optimization.py` with a fixed set of
+arguments, and appends the result to `kostal-battery.log` in the project
+directory.
 
 Before using it, adjust the script for your own installation:
 
 - `PROJECT_DIR`: path to the cloned repository.
 - `ENV_FILE`: path to the environment file containing `KOSTAL_PASSWORD` and
   `SOLCAST_API_KEY`.
-- The `exec "$PROJECT_DIR/.venv/bin/python" ...` call and its parameters
+- The `"$PROJECT_DIR/.venv/bin/python" ...` call and its parameters
   (`--host`, `--south-resource-id`, `--north-resource-id`, battery capacity,
   etc.) to match your inverter and Solcast configuration.
+
+Make the script executable:
+
+```bash
+chmod +x run-kostal.sh
+```
 
 Example crontab entry that runs the script every day at 05:30, before sunrise,
 and applies the calculated schedule:
@@ -213,6 +241,10 @@ and applies the calculated schedule:
 ```cron
 30 5 * * * /home/eisenluk/kostal_battery_optimization/run-kostal.sh --apply >> /home/eisenluk/kostal_battery_optimization/kostal-cron.log 2>&1
 ```
+
+The script already appends its own output to `kostal-battery.log`; the
+`kostal-cron.log` redirect above is only a fallback that catches early
+failures (e.g. a missing environment file) which happen before that point.
 
 Without `--apply`, the script only prints the calculated schedule and does not
 write it to the inverter.
@@ -224,6 +256,16 @@ early in summer or too late in winter. `run-after-sunrise.py` calculates
 today's sunrise for the configured location, waits until 30 minutes after
 sunrise, and then runs `run-kostal.sh --apply`.
 
+Before using it, adjust the constants at the top of the script for your own
+installation: `LATITUDE`, `LONGITUDE`, `TIMEZONE`, `RUN_SCRIPT`, and
+`LOG_FILE`.
+
+Make the script executable:
+
+```bash
+chmod +x run-after-sunrise.py
+```
+
 Schedule it once per day, early enough to cover the earliest possible sunrise
 of the year:
 
@@ -233,7 +275,10 @@ of the year:
 
 This starts the script at 03:00, which then sleeps until 30 minutes after
 sunrise and triggers `run-kostal.sh`, so the battery schedule is calculated and
-applied at a time that automatically adapts to the season.
+applied at a time that automatically adapts to the season. It writes its own
+"Waiting until ..." message directly to `kostal-battery.log`; the
+`sunrise-cron.log` redirect above only catches errors that happen before that
+point (e.g. the interpreter in the script's shebang line not existing).
 
 ## Output
 
@@ -241,6 +286,7 @@ The script prints a JSON object such as:
 
 ```json
 {
+  "script_run_time": "2026-08-29T05:30:04.123456+02:00",
   "status": "changed",
   "applied": false,
   "weekday": "sat",
