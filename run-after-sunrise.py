@@ -15,6 +15,13 @@ LONGITUDE = 8.765966
 TIMEZONE = ZoneInfo("Europe/Zurich")
 
 RUN_SCRIPT = "/home/eisenluk/kostal_battery_optimization/run-kostal.sh"
+LOG_FILE = "/home/eisenluk/kostal_battery_optimization/kostal-battery.log"
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
+    with open(LOG_FILE, "a") as f:
+        f.write(message + "\n")
 
 
 def main():
@@ -34,13 +41,10 @@ def main():
     delay = (target - now).total_seconds()
 
     if delay > 0:
-        print(f"Waiting until {target.isoformat()}", flush=True)
+        log(f"Waiting until {target.isoformat()}")
         time.sleep(delay)
     else:
-        print(
-            f"Today's target time {target.isoformat()} has already passed",
-            flush=True,
-        )
+        log(f"Today's target time {target.isoformat()} has already passed")
         return
 
     subprocess.run([RUN_SCRIPT, "--apply"], check=True)

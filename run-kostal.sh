@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="/home/eisenluk/kostal_battery_optimization"
 ENV_FILE="/home/eisenluk/kostal_battery_optimization/kostal-battery.env"
+LOG_FILE="$PROJECT_DIR/kostal-battery.log"
 
 # Prevent overlapping executions.
 exec 9>"$PROJECT_DIR/kostal-battery.lock"
@@ -33,7 +34,7 @@ if [[ "${1:-}" == "--apply" ]]; then
     APPLY_ARGS+=(--apply)
 fi
 
-exec "$PROJECT_DIR/.venv/bin/python" \
+"$PROJECT_DIR/.venv/bin/python" \
     "$PROJECT_DIR/kostal_battery_optimization.py" \
     --host kostal-wr1.ciscofreak.local \
     --solar-auto \
@@ -43,4 +44,4 @@ exec "$PROJECT_DIR/.venv/bin/python" \
     --battery-capacity-kwh 22.1 \
     --south-resource-id c0f0-2f3d-2107-648b \
     --north-resource-id 30f4-9257-92b0-6819 \
-    "${APPLY_ARGS[@]}"
+    "${APPLY_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"

@@ -272,9 +272,16 @@ def main() -> None:
     if args.solar_auto and not password:
         raise SystemExit("The KOSTAL_PASSWORD environment variable is missing")
 
+    tz = ZoneInfo(args.timezone)
+    run_time = datetime.now(tz)
+
     if args.from_time is not None:
         values = {day: make_day(args.from_time) for day in args.days}
-        result = {"status": "preview" if not args.apply else "changed", "values": values}
+        result = {
+            "script_run_time": run_time.isoformat(),
+            "status": "preview" if not args.apply else "changed",
+            "values": values,
+        }
         if args.apply:
             if not password:
                 raise SystemExit("The KOSTAL_PASSWORD environment variable is missing")
@@ -294,8 +301,7 @@ def main() -> None:
     if not 0 <= args.forecast_safety_percent < 100:
         raise SystemExit("--forecast-safety-percent must be between 0 and 100")
 
-    tz = ZoneInfo(args.timezone)
-    now = datetime.now(tz)
+    now = run_time
     location = LocationInfo(latitude=args.latitude, longitude=args.longitude, timezone=args.timezone)
     solar = sun(location.observer, date=now.date(), tzinfo=tz)
     sunrise = solar["sunrise"]
@@ -336,6 +342,7 @@ def main() -> None:
         wrote = True
 
     result = {
+        "script_run_time": run_time.isoformat(),
         "status": status,
         "applied": wrote,
         "date": now.date().isoformat(),
