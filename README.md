@@ -229,6 +229,29 @@ Before using it, adjust the script for your own installation:
   (`--host`, `--south-resource-id`, `--north-resource-id`, battery capacity,
   etc.) to match your inverter and Solcast configuration.
 
+#### Seasonal reserve
+
+The wrapper adjusts `--sunset-buffer-minutes` and `--forecast-safety-percent`
+to the date it runs, because autumn, winter and spring need a larger reserve:
+
+| Period |                 Sunset buffer | Forecast safety |
+| --- |------------------------------:|----------------:|
+| 31 March – 31 August |                      `30 min` |           `10%` |
+| 1 September → 21 December | rises linearly `30 → 240 min` |      `10 → 75%` |
+| 21 December → 31 March | falls linearly `240 → 30 min` |      `75 → 10%` |
+
+The summer and winter values are set at the top of the seasonal block in
+`run-kostal.sh`. To preview the values for a specific date, set
+`SEASON_DATE=YYYY-MM-DD` before running the script.
+
+#### Other weekdays
+
+The wrapper passes `--clear-other-days`. The calculated schedule is written
+for the current weekday, and all other weekdays are reset to an unrestricted
+schedule (96 × `0`), so a stale schedule from a previous day can never block
+charging. Only days whose schedule actually differs are written, all in a
+single settings update.
+
 Make the script executable:
 
 ```bash

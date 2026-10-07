@@ -251,6 +251,10 @@ def parse_args():
         help="Weekdays to change; default: all days",
     )
     parser.add_argument("--apply", action="store_true", help="Write the calculated change")
+    parser.add_argument(
+        "--clear-other-days", action="store_true",
+        help="Solar-auto mode: reset all other weekdays to an unrestricted schedule",
+    )
     parser.add_argument("--latitude", type=float, default=47.634782)
     parser.add_argument("--longitude", type=float, default=8.765966)
     parser.add_argument("--timezone", default="Europe/Zurich")
@@ -334,11 +338,16 @@ def main() -> None:
     day = WEEKDAYS[now.weekday()]
     new_value = make_day(charge_start.hour * 4 + charge_start.minute // 15)
     old_value = before.get(DAY_IDS[day])
-    changed = old_value != new_value
+    desired = {day: new_value}
+    if args.clear_other_days:
+        desired.update({other: make_day(0) for other in WEEKDAYS if other != day})
+    # Only write days that differ, as every settings write resets the MPPT trackers.
+    pending = {d: v for d, v in desired.items() if before.get(DAY_IDS[d]) != v}
+    changed = bool(pending)
     status = "insufficient_forecast_energy" if not sufficient else ("changed" if changed else "unchanged")
     wrote = False
     if args.apply and changed:
-        api.write_schedule({day: new_value})
+        api.write_schedule(pending)
         wrote = True
 
     result = {
@@ -361,6 +370,7 @@ def main() -> None:
         "charge_allowed_from": charge_start.isoformat(),
         "old_schedule": old_value,
         "new_schedule": new_value,
+        "other_days_cleared": [d for d in WEEKDAYS if d != day and d in pending],
     }
     print(json.dumps(result, indent=2))
 
