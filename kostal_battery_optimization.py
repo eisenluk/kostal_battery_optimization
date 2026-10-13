@@ -14,6 +14,8 @@ import hmac
 import json
 import os
 import secrets
+import sys
+import time
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -33,6 +35,8 @@ DAY_IDS = {
     "sun": "Battery:TimeControl:ConfSun",
 }
 WEEKDAYS = tuple(DAY_IDS)
+# Waits between Solcast retries (seconds): about 30 minutes in total.
+SOLCAST_RETRY_DELAYS_S = (60, 120, 300, 600, 900)
 
 
 def quarters_until(value: str) -> int:
@@ -157,16 +161,44 @@ def parse_solcast_time(value: str) -> datetime:
 
 def fetch_solcast(resource_id: str, api_key: str, timezone: ZoneInfo) -> dict[datetime, float]:
     url = f"https://api.solcast.com.au/rooftop_sites/{resource_id}/forecasts"
-    response = requests.get(
-        url,
-        params={"format": "json"},
-        headers={"Authorization": f"Bearer {api_key}"},
-        timeout=30,
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"Solcast {resource_id} request failed: HTTP {response.status_code}: {response.text}"
+    # Solcast answers HTTP 429 both when the daily quota is used up and when its
+    # servers are busy (common for hobbyist accounts). Retry with backoff so a
+    # temporary rejection does not abort the daily run.
+    delays = SOLCAST_RETRY_DELAYS_S
+    for attempt in range(len(delays) + 1):
+        try:
+            response = requests.get(
+                url,
+                params={"format": "json"},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            if attempt == len(delays):
+                raise RuntimeError(f"Solcast {resource_id} request failed: {exc}") from exc
+            wait = delays[attempt]
+            print(f"Solcast {resource_id}: {exc}; retrying in {wait}s", file=sys.stderr, flush=True)
+            time.sleep(wait)
+            continue
+        if response.ok:
+            break
+        retryable = response.status_code == 429 or response.status_code >= 500
+        if not retryable or attempt == len(delays):
+            raise RuntimeError(
+                f"Solcast {resource_id} request failed after {attempt + 1} attempt(s): "
+                f"HTTP {response.status_code}: {response.text}"
+            )
+        wait = delays[attempt]
+        retry_after = response.headers.get("Retry-After", "")
+        if retry_after.isdigit():
+            wait = max(wait, int(retry_after))
+        print(
+            f"Solcast {resource_id}: HTTP {response.status_code} {response.text!r}; "
+            f"retrying in {wait}s (attempt {attempt + 1}/{len(delays) + 1})",
+            file=sys.stderr,
+            flush=True,
         )
+        time.sleep(wait)
     forecasts = response.json().get("forecasts", [])
     if not forecasts:
         raise RuntimeError(f"Solcast {resource_id} returned no forecast intervals")
