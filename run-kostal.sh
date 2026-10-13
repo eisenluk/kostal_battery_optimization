@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_DIR="/home/eisenluk/kostal_battery_optimization"
-ENV_FILE="/home/eisenluk/kostal_battery_optimization/kostal-battery.env"
+# Directory of this script, so the project works in any folder.
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$PROJECT_DIR/kostal-battery.env"
 LOG_FILE="$PROJECT_DIR/kostal-battery.log"
 
 # Prevent overlapping executions.

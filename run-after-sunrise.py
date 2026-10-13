@@ -3,6 +3,7 @@
 import subprocess
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from astral import Observer
@@ -14,8 +15,10 @@ LATITUDE = 47.634782
 LONGITUDE = 8.765966
 TIMEZONE = ZoneInfo("Europe/Zurich")
 
-RUN_SCRIPT = "/home/eisenluk/kostal_battery_optimization/run-kostal.sh"
-LOG_FILE = "/home/eisenluk/kostal_battery_optimization/kostal-battery.log"
+# Paths relative to this file, so the project works in any folder.
+PROJECT_DIR = Path(__file__).resolve().parent
+RUN_SCRIPT = str(PROJECT_DIR / "run-kostal.sh")
+LOG_FILE = PROJECT_DIR / "kostal-battery.log"
 
 
 def log(message: str) -> None:
