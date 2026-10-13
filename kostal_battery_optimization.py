@@ -37,6 +37,10 @@ DAY_IDS = {
 WEEKDAYS = tuple(DAY_IDS)
 # Waits between Solcast retries (seconds): about 30 minutes in total.
 SOLCAST_RETRY_DELAYS_S = (60, 120, 300, 600, 900)
+# Since Oct 2026 Solcast's CDN (CloudFront) answers non-browser User-Agents
+# (curl, python-requests, custom strings) with an empty HTTP 429, so send a
+# browser-like one.
+SOLCAST_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
 
 def quarters_until(value: str) -> int:
@@ -170,7 +174,10 @@ def fetch_solcast(resource_id: str, api_key: str, timezone: ZoneInfo) -> dict[da
             response = requests.get(
                 url,
                 params={"format": "json"},
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": SOLCAST_USER_AGENT,
+                },
                 timeout=30,
             )
         except requests.RequestException as exc:
